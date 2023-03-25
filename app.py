@@ -1,22 +1,8 @@
 import openai
-from gtts import gTTS
-import pygame
 
-from io import BytesIO
 import os
 import subprocess
 from sys import exit
-
-def say(text):
-    tts = gTTS(text=text, lang='en')
-    fp = BytesIO()
-    tts.write_to_fp(fp)
-    fp.seek(0)
-    pygame.mixer.init()
-    pygame.mixer.music.load(fp)
-    pygame.mixer.music.play()
-    while pygame.mixer.music.get_busy():
-        pygame.time.Clock().tick(10)
 
 if not os.path.exists(".key"):
     print("Not an AI: please put your OpenAI API key in '.key' ")
@@ -70,14 +56,6 @@ start_messages = [
         "role": "system",
         "content": "Any text that does not match one of the above commands will simply be printed out. You are allowed to display text while running commands if desired.",
     },
-    {
-        "role": "system",
-        "content": "If you reccomend a command with $, please mention that you're running a command."
-    },
-    {
-        "role": "system",
-        "content": "Note that any line not starting with a $ will be piped to text to speech. Please avoid extra characters."
-    },
     {"role": "user", "content": "Make a directory called 'test'"},
     {"role": "assistant", "content": "$ mkdir test"},
     {"role": "system", "content": "(no output from command)"},
@@ -119,11 +97,9 @@ while True:
         print("AI: " + resp)
 
         command = False
-        spoken = False
         stdout = ""
 
         if "\n" in resp:
-            speak = []
             for line in resp.split("\n"):
                 if len(line) > 0:
                     if line[0] == "$":
@@ -137,10 +113,6 @@ while True:
                         os.system("rm temp.sh")
                         stdout = result.stdout.decode()
                         command = True
-                    else:
-                        speak.append(line)
-            say("\n".join(speak))
-            spoken = True
 
         if resp[0] == "$":
             do = resp.replace("$ ", "")
@@ -152,9 +124,6 @@ while True:
             os.system("rm temp.sh")
             stdout = result.stdout.decode()
             command = True
-
-        if not spoken:
-            say(resp)
 
         saved_messages.append({"role": "assistant", "content": resp})
         if command:
