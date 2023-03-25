@@ -1,6 +1,12 @@
 import openai
+
 import os
 import subprocess
+from sys import exit
+
+if not os.path.exists(".key"):
+    print("Not an AI: please put your OpenAI API key in '.key' ")
+    exit()
 
 # set your OpenAI API key
 openai.api_key = open(".key").read().strip()
