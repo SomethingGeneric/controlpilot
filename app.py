@@ -238,7 +238,7 @@ while True:
                     result = subprocess.run(
                         ["cmd", "/c", "temp.bat"], stdout=subprocess.PIPE, shell=True
                     )
-                    os.system("rm temp.bat")
+                    os.system("del temp.bat")
                     stdout = result.stdout.decode()
 
                     saved_messages.append(

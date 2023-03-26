@@ -1,6 +1,7 @@
 # Whooo
 .key
 temp.sh
+temp.bat
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
