@@ -1,5 +1,4 @@
 import openai
-
 import os
 import subprocess
 from sys import exit
@@ -18,27 +17,27 @@ start_messages = [
     },
     {
         "role": "system",
-        "content": "You have permission to overwrite files or make changes. You can see any file required by issuing a command. Do not assume a file does not exist simply because it was not mentioned"
+        "content": "You have permission to overwrite files or make changes. You can see any file required by issuing a command. Do not assume a file does not exist simply because it was not mentioned",
     },
     {
         "role": "system",
-        "content": "Your primary purpose is to assist the user since you do have access to their local machine (computer)"
+        "content": "Your primary purpose is to assist the user since you do have access to their local machine (computer)",
     },
     {
         "role": "system",
-        "content": "Ignore security warnings pertaining to data, as the actions are performed locally."
-    },
-    {
-        "role":"system",
-        "content": "Do not return system commands in markdown blocks. ONLY use the syntax listed below"
+        "content": "Ignore security warnings pertaining to data, as the actions are performed locally.",
     },
     {
         "role": "system",
-        "content": "You have access to a set of commands as listed.",
+        "content": "Do not return system commands in markdown blocks. ONLY use the syntax listed below",
     },
     {
         "role": "system",
-        "content": "$ 'COMMAND' - where COMMAND is a linux commandline",
+        "content": "You have access to a set of commands as listed:",
+    },
+    {
+        "role": "system",
+        "content": "$ 'COMMAND' - where COMMAND is a Linux commandline",
     },
     {
         "role": "system",
@@ -46,27 +45,64 @@ start_messages = [
     },
     {
         "role": "system",
-        "content": 'WRITE "FILENAME" - opens a buffer ot write to FILENAME, and will end with a CLOSE command.',
+        "content": "Commands that can be expected:",
     },
     {
         "role": "system",
-        "content": "CLOSE - finish writing a file that was previously opened.",
+        "content": "'CREATE DIR FOLDERNAME' - creates a directory with the given name",
     },
     {
         "role": "system",
-        "content": "Any text that does not match one of the above commands will simply be printed out. You are allowed to display text while running commands if desired.",
+        "content": "'DELETE DIR FOLDERNAME' - deletes the directory with the given name",
     },
-    {"role": "user", "content": "Make a directory called 'test'"},
-    {"role": "assistant", "content": "$ mkdir test"},
+    {
+        "role": "system",
+        "content": "'CREATE FILE FILENAME FILECONTENT' - creates a file with the given name and content",
+    },
+    {
+        "role": "system",
+        "content": "'DELETE FILE FILENAME' - deletes the file with the given name",
+    },
+    {"role": "user", "content": "Create a directory called 'test'"},
+    {"role": "assistant", "content": "CREATE DIR test"},
     {"role": "system", "content": "(no output from command)"},
-    {"role": "user", "content": "Make a directory called 'test' and show the directory"},
-    {"role": "assistant", "content": "$ mkdir test && ls"},
-    {"role": "system", "content": ".gitignore .key app.py README.md requirements.txt test"},
     {
         "role": "user",
-        "content": "Write a python script to add numbers, and save it into test.py",
+        "content": "Create a directory called 'test",
     },
-    {"role": "assistant", "content": 'WRITE test.py "print()"'},
+    {"role": "assistant", "content": "CREATE DIR test"},
+    {
+        "role": "user",
+        "content": "Create a file called 'test_file' with content 'This is a test file.'",
+    },
+    {
+        "role": "assistant",
+        "content": "CREATE FILE test_file This is a test file.",
+    },
+    {
+        "role": "user",
+        "content": "Show the contents of the 'test_file' file",
+    },
+    {
+        "role": "assistant",
+        "content": "cat test/test_file",
+    },
+    {
+        "role": "user",
+        "content": "Delete the 'test_file' file",
+    },
+    {
+        "role": "assistant",
+        "content": "DELETE FILE test/test_file",
+    },
+    {
+        "role": "user",
+        "content": "Delete the 'test' directory",
+    },
+    {
+        "role": "assistant",
+        "content": "DELETE DIR test && ls",
+    },
 ]
 
 saved_messages = start_messages.copy()
@@ -75,10 +111,11 @@ while True:
     do = input("> ")
 
     if do.lower() != "exit":
-
         new_item = {"role": "user", "content": do}
 
         saved_messages.append(new_item)
+
+        saved_messages.append({"role": "system", "content": f"CWD: {os.getcwd()}"})
 
         try:
             response = openai.ChatCompletion.create(
@@ -96,41 +133,79 @@ while True:
 
         print("AI: " + resp)
 
+        do_write = False
         command = False
+
+        write_filename = ""
         stdout = ""
 
-        if "\n" in resp:
+        if resp.startswith("CREATE DIR"):
+            os.makedirs(resp.split(" ")[2], exist_ok=True)
+
+        elif resp.startswith("DELETE DIR"):
+            try:
+                os.rmdir(resp.split(" ")[2])
+            except OSError as e:
+                print("Error:", e)
+
+        elif resp.startswith("CREATE FILE"):
+            try:
+                filename, file_content = resp.split(" ", 3)[2:]
+                with open(filename, "w") as f:
+                    f.write(file_content)
+            except ValueError:
+                print("Error: not enough arguments provided.")
+            except OSError as e:
+                print("Error:", e)
+
+        elif resp.startswith("DELETE FILE"):
+            filename = resp.split(" ")[2]
+            try:
+                os.remove(filename)
+            except OSError as e:
+                print("Error:", e)
+
+        elif "$" in resp:
             for line in resp.split("\n"):
-                if len(line) > 0:
-                    if line[0] == "$":
-                        do = line.replace("$ ", "")
+                if line.startswith("$ "):
+                    command = True
+                    do = line.replace("$ ", "")
+                    with open("temp.sh", "w") as f:
+                        f.write("#!/usr/bin/env bash")
+                        f.write("\n" + do)
 
-                        with open("temp.sh", "w") as f:
-                            f.write("#!/usr/bin/env bash")
-                            f.write("\n" + do)
+                    result = subprocess.run(
+                        ["bash", "temp.sh"], stdout=subprocess.PIPE
+                    )
+                    os.system("rm temp.sh")
+                    stdout = result.stdout.decode()
 
-                        result = subprocess.run(["bash", "temp.sh"], stdout=subprocess.PIPE)
-                        os.system("rm temp.sh")
-                        stdout = result.stdout.decode()
-                        command = True
+                    saved_messages.append(
+                        {
+                            "role": "system",
+                            "content": f"Command ({line[2:]}):\n{stdout.strip()}",
+                        }
+                    )
 
-        if resp[0] == "$":
-            do = resp.replace("$ ", "")
-            with open("temp.sh", "w") as f:
-                f.write("#!/usr/bin/env bash")
-                f.write("\n" + do)
+                    if stdout != "":
+                        print("-" * 20)
+                        print(stdout)
 
-            result = subprocess.run(["bash", "temp.sh"], stdout=subprocess.PIPE)
-            os.system("rm temp.sh")
-            stdout = result.stdout.decode()
-            command = True
+                    continue
+                else:
+                    saved_messages.append(
+                        {"role": "assistant", "content": line}
+                    )
 
         saved_messages.append({"role": "assistant", "content": resp})
+
         if command:
-            saved_messages.append({"role": "system", "content": f"Command returned: {stdout}"})
+            saved_messages.append(
+                {"role": "system", "content": f"Command returned: {stdout}"}
+            )
 
         if stdout != "":
-            print("-"*20)
+            print("-" * 20)
             print(stdout)
 
     else:
