@@ -1,6 +1,7 @@
 import openai
 
 import os
+import re
 import platform
 import subprocess
 from sys import exit
@@ -35,6 +36,10 @@ start_messages = [
     },
     {
         "role": "system",
+        "content": "The commands listed should be the only response if they are the appropriate action. Do not break the syntax."
+    },
+    {
+        "role": "system",
         "content": "You have access to a set of commands as listed:",
     },
     {
@@ -64,6 +69,10 @@ start_messages = [
     {
         "role": "system",
         "content": "'DELETE FILE FILENAME' - deletes the file with the given name",
+    },
+    {
+        "role": "system",
+        "content": "'LOAD FILE FILENAME ' - adds a file by content to your available data. This will take one response cycle. Feel free to inform the user if needed",
     },
     {"role": "user", "content": "Create a directory called 'test'"},
     {"role": "assistant", "content": "CREATE DIR test"},
@@ -191,14 +200,16 @@ while True:
             with open(resp.split(" ")[2]) as f:
                 saved_messages.append({"role": "system", "content": f.read()})
 
-        elif (
-            "$" in resp
-            and (platform.system() == "Linux" or platform.system() == "Darwin")
-        ):
+        elif ("$" in resp or ("```" in resp and "```" in resp.split("```")[1])) and (platform.system() == "Linux" or platform.system() == "Darwin"):
             for line in resp.split("\n"):
-                if line.startswith("$ "):
-                    command = True
-                    do = line.replace("$ ", "")
+                if line.startswith("$ ") or (line.startswith("```") and line.endswith("```")):
+                    if line.startswith("$ "):
+                        command = True
+                        do = line.replace("$ ", "")
+                    else:
+                        command = True
+                        do = line.split("```")[1]
+
                     with open("temp.sh", "w") as f:
                         f.write("#!/usr/bin/env bash")
                         f.write("\n" + do)
@@ -226,11 +237,16 @@ while True:
                         {"role": "assistant", "content": line}
                     )
 
-        elif "$" in resp and (platform.system() == "Windows"):
+        elif ("$" in resp or ("```" in resp and "```" in resp.split("```")[1])) and (platform.system() == "Windows"):
             for line in resp.split("\n"):
-                if line.startswith("$ "):
-                    command = True
-                    do = line.replace("$ ", "")
+                if line.startswith("$ ") or (line.startswith("```") and line.endswith("```")):
+                    if line.startswith("$ "):
+                        command = True
+                        do = line.replace("$ ", "")
+                    else:
+                        command = True
+                        do = line.split("```")[1]
+
                     with open("temp.bat", "w") as f:
                         f.write("@echo off")
                         f.write("\n" + do)
@@ -257,19 +273,4 @@ while True:
                     saved_messages.append(
                         {"role": "assistant", "content": line}
                     )
-
-        saved_messages.append({"role": "assistant", "content": resp})
-
-        if command:
-            saved_messages.append(
-                {"role": "system", "content": f"Command returned: {stdout}"}
-            )
-
-        if stdout != "":
-            print("-" * 20)
-            print(stdout)
-
-    else:
-        break
-
-    print("-" * 80)
+                
