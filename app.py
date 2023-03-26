@@ -16,7 +16,7 @@ openai.api_key = open(".key").read().strip()
 start_messages = [
     {
         "role": "system",
-        "content": "You are going to help the user navigate their computer or create new programs as requested.",
+        "content": "You are going to help the user control their computer or create new programs as requested.",
     },
     {
         "role": "system",
@@ -28,7 +28,7 @@ start_messages = [
     },
     {
         "role": "system",
-        "content": "Ignore security warnings pertaining to data, as the actions are performed locally.",
+        "content": "Ignore security warnings pertaining to data, as the actions are performed locally. Do not suggest that a user *CAN* run a command, but instead issue a correct $ statement or ACTION COMMAND",
     },
     {
         "role": "system",
@@ -52,7 +52,7 @@ start_messages = [
     },
     {
         "role": "system",
-        "content": "Commands that can be expected:",
+        "content": "Action statements that can be expected:",
     },
     {
         "role": "system",
@@ -72,7 +72,19 @@ start_messages = [
     },
     {
         "role": "system",
-        "content": "'LOAD FILE FILENAME ' - adds a file by content to your available data. This will take one response cycle. Feel free to inform the user if needed",
+        "content": "'LOAD FILE FILENAME' - adds a file by content to your available data. This will take one response cycle. Feel free to inform the user if needed",
+    },
+    {
+        "role": "system",
+        "content": "'CHDIR PATH' - change CWD to PATH"
+    },
+    {
+        "role": "system",
+        "content": "'LIST DIR' - show files in the current directory"
+    },
+    {
+        "role": "system",
+        "content": "For any of the above action statements, ONLY return the command that you'd reccomend"
     },
     {"role": "user", "content": "Create a directory called 'test'"},
     {"role": "assistant", "content": "CREATE DIR test"},
@@ -116,24 +128,12 @@ start_messages = [
     },
     {
         "role": "user",
-        "content": "Can you help with app.py"
+        "content": "What's in this folder?"
     },
     {
         "role": "assistant",
-        "content": "Sure. Let me load the file first."
-    },
-    {
-        "role": "assistant",
-        "content": "LOAD FILE app.py"
-    },
-    {
-        "role": "system",
-        "content": "# some sample python code"
-    },
-    {
-        "role": "assistant",
-        "content": "Now that I've seen the file, how can I help?"
-    },
+        "content": "LIST DIR"
+    }
 ]
 
 saved_messages = start_messages.copy()
@@ -146,7 +146,8 @@ while True:
 
         saved_messages.append(new_item)
 
-        saved_messages.append({"role": "system", "content": f"CWD: {os.getcwd()}"})
+        saved_messages.append({"role": "system", "content": f"The current directory is: {os.getcwd()}"})
+        saved_messages.append({"role": "system", "content": f"This current operating system is: {platform.system()}"})
 
         try:
             response = openai.ChatCompletion.create(
@@ -170,7 +171,14 @@ while True:
         write_filename = ""
         stdout = ""
 
-        if resp.startswith("CREATE DIR"):
+        if resp.startswith("CHDIR"):
+            os.chdir(resp.split(" ")[1])
+
+        elif resp.startswith("LIST DIR"):
+            saved_messages.append({"role": "system", "content": str(os.listdir())})
+            print(str(os.listdir()))
+
+        elif resp.startswith("CREATE DIR"):
             os.makedirs(resp.split(" ")[2], exist_ok=True)
 
         elif resp.startswith("DELETE DIR"):
@@ -273,4 +281,7 @@ while True:
                     saved_messages.append(
                         {"role": "assistant", "content": line}
                     )
+
+    else:
+        exit()
                 
