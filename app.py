@@ -1,5 +1,7 @@
 import openai
+
 import os
+import platform
 import subprocess
 from sys import exit
 
@@ -101,7 +103,27 @@ start_messages = [
     },
     {
         "role": "assistant",
-        "content": "DELETE DIR test && ls",
+        "content": "DELETE DIR test",
+    },
+    {
+        "role": "user",
+        "content": "Can you help with app.py"
+    },
+    {
+        "role": "assistant",
+        "content": "Sure. Let me load the file first."
+    },
+    {
+        "role": "assistant",
+        "content": "LOAD FILE app.py"
+    },
+    {
+        "role": "system",
+        "content": "# some sample python code"
+    },
+    {
+        "role": "assistant",
+        "content": "Now that I've seen the file, how can I help?"
     },
 ]
 
@@ -165,7 +187,14 @@ while True:
             except OSError as e:
                 print("Error:", e)
 
-        elif "$" in resp:
+        elif resp.startswith("LOAD FILE"):
+            with open(resp.split(" ")[2]) as f:
+                saved_messages.append({"role": "system", "content": f.read()})
+
+        elif (
+            "$" in resp
+            and (platform.system() == "Linux" or platform.system() == "Darwin")
+        ):
             for line in resp.split("\n"):
                 if line.startswith("$ "):
                     command = True
@@ -178,6 +207,38 @@ while True:
                         ["bash", "temp.sh"], stdout=subprocess.PIPE
                     )
                     os.system("rm temp.sh")
+                    stdout = result.stdout.decode()
+
+                    saved_messages.append(
+                        {
+                            "role": "system",
+                            "content": f"Command ({line[2:]}):\n{stdout.strip()}",
+                        }
+                    )
+
+                    if stdout != "":
+                        print("-" * 20)
+                        print(stdout)
+
+                    continue
+                else:
+                    saved_messages.append(
+                        {"role": "assistant", "content": line}
+                    )
+
+        elif "$" in resp and (platform.system() == "Windows"):
+            for line in resp.split("\n"):
+                if line.startswith("$ "):
+                    command = True
+                    do = line.replace("$ ", "")
+                    with open("temp.bat", "w") as f:
+                        f.write("@echo off")
+                        f.write("\n" + do)
+
+                    result = subprocess.run(
+                        ["cmd", "/c", "temp.bat"], stdout=subprocess.PIPE, shell=True
+                    )
+                    os.system("rm temp.bat")
                     stdout = result.stdout.decode()
 
                     saved_messages.append(
