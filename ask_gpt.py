@@ -35,13 +35,13 @@ while True:
 
     try:
         response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
+                    model="gpt-4",
                     messages=saved_messages,
         )
     except:
         saved_messages = start_messages.copy()  
         response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4",
                 messages=saved_messages,
         )
 
